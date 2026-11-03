@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modüler Android Bütçe Takip Uygulaması</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        pastel: {
+                            blue: '#e0f2fe',
+                            green: '#dcfce7',
+                            pink: '#fce7f3',
+                            purple: '#f3e8ff',
+                            amber: '#fef3c7'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .gradient-card {
+            background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%);
+            box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4);
+        }
+        .gradient-income {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4);
+        }
+        .gradient-expense {
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+            box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.4);
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+        }
+        .dark .glass {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen font-sans pb-20">
+
+    <!-- Header & Theme / Privacy Controls -->
+    <header class="glass sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+        <div class="max-w-md mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <img src="assets/icon.png" alt="Icon" class="w-10 h-10 rounded-xl shadow-md object-cover border border-indigo-500/30">
+                <div>
+                    <h1 class="font-bold text-base leading-tight">Bütçe Takip</h1>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Modüler Android PWA</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="togglePrivacyMode()" id="privacyBtn" class="p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition hover:scale-105" title="Gizlilik Modu">
+                    <i class="fa-solid fa-eye"></i>
+                </button>
+                <button onclick="toggleDarkMode()" class="p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition hover:scale-105" title="Tema Değiştir">
+                    <i class="fa-solid fa-moon dark:fa-sun"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-md mx-auto p-4 space-y-6">
+
+        <!-- Summary 3D Gradient Cards -->
+        <div class="grid grid-cols-3 gap-3">
+            <div class="gradient-card rounded-2xl p-3 text-white col-span-3">
+                <div class="flex justify-between items-center text-xs opacity-80 uppercase tracking-wider mb-1">
+                    <span>Net Bakiye</span>
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+                <div id="netBalance" class="text-2xl font-extrabold tracking-tight">0.00 TL</div>
+            </div>
+            <div class="gradient-income rounded-2xl p-3 text-white">
+                <div class="text-[10px] opacity-80 uppercase tracking-wider mb-1">Toplam Gelir</div>
+                <div id="totalIncome" class="text-sm font-bold truncate">0.00 TL</div>
+            </div>
+            <div class="gradient-expense rounded-2xl p-3 text-white col-span-2">
+                <div class="text-[10px] opacity-80 uppercase tracking-wider mb-1">Toplam Gider</div>
+                <div id="totalExpense" class="text-sm font-bold truncate">0.00 TL</div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-2xl">
+            <button onclick="switchTab('transactions')" id="tab-transactions" class="flex-1 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-700 shadow-sm transition">İşlemler</button>
+            <button onclick="switchTab('limits')" id="tab-limits" class="flex-1 py-2 text-xs font-bold rounded-xl text-slate-500 transition">Limitler</button>
+            <button onclick="switchTab('analytics')" id="tab-analytics" class="flex-1 py-2 text-xs font-bold rounded-xl text-slate-500 transition">Analiz</button>
+            <button onclick="switchTab('settings')" id="tab-settings" class="flex-1 py-2 text-xs font-bold rounded-xl text-slate-500 transition">Ayarlar</button>
+        </div>
+
+        <!-- TAB 1: TRANSACTIONS -->
+        <div id="view-transactions" class="space-y-4">
+            <!-- Add Form Card -->
+            <div class="glass p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-lg space-y-3">
+                <h2 class="font-bold text-sm flex items-center space-x-2 text-indigo-600 dark:text-indigo-400">
+                    <i class="fa-solid fa-circle-plus"></i>
+                    <span>Yeni İşlem Ekle</span>
+                </h2>
+                <form id="transactionForm" onsubmit="addTransaction(event)" class="space-y-3">
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="txType" class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-indigo-500">
+                            <option value="expense">Gider (-) </option>
+                            <option value="income">Gelir (+)</option>
+                        </select>
+                        <input type="number" id="txAmount" step="0.01" placeholder="Tutar (TL)" required class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <input type="text" id="txTitle" placeholder="Açıklama (Örn: Mutfak Alışverişi)" required class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-indigo-500">
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="txCategory" class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-indigo-500">
+                            <option value="Mutfak">Mutfak</option>
+                            <option value="Faturalar">Faturalar</option>
+                            <option value="Ulaşım">Ulaşım</option>
+                            <option value="Eğlence">Eğlence</option>
+                            <option value="Maaş">Maaş</option>
+                            <option value="Diğer">Diğer</option>
+                        </select>
+                        <input type="date" id="txDate" required class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <button type="submit" class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-lg shadow-indigo-500/30 transition">Kaydet</button>
+                </form>
+            </div>
+
+            <!-- Transaction List -->
+            <div class="glass p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-lg space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-xs uppercase tracking-wider text-slate-500">İşlem Geçmişi</h3>
+                    <span id="txCount" class="text-xs font-semibold bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded-full">0</span>
+                </div>
+                <div id="transactionList" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    <!-- Dynamic Items -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: LIMITS -->
+        <div id="view-limits" class="space-y-4 hidden">
+            <div class="glass p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-lg space-y-3">
+                <h2 class="font-bold text-sm flex items-center space-x-2 text-indigo-600 dark:text-indigo-400">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Kategori Bazlı Limitler</span>
+                </h2>
+                <p class="text-xs text-slate-500">Her kategori için aylık harcama limitleri belirleyin.</p>
+                <div id="categoryLimitsContainer" class="space-y-3">
+                    <!-- Dynamic Limit Bars -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: ANALYTICS -->
+        <div id="view-analytics" class="space-y-4 hidden">
+            <div class="glass p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-lg space-y-4">
+                <h2 class="font-bold text-sm flex items-center space-x-2 text-indigo-600 dark:text-indigo-400">
+                    <i class="fa-solid fa-chart-column"></i>
+                    <span>Harcama Dağılımı</span>
+                </h2>
+                <div id="analyticsSummary" class="space-y-3 text-xs">
+                    <!-- Dynamic Analytics Bars -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: SETTINGS & BACKUP -->
+        <div id="view-settings" class="space-y-4 hidden">
+            <div class="glass p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-lg space-y-4">
+                <h2 class="font-bold text-sm flex items-center space-x-2 text-indigo-600 dark:text-indigo-400">
+                    <i class="fa-solid fa-database"></i>
+                    <span>Veri ve Yedekleme</span>
+                </h2>
+                <div class="space-y-2">
+                    <button onclick="exportJSON()" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-lg shadow-emerald-500/30 transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-download"></i>
+                        <span>JSON Yedek İndir</span>
+                    </button>
+                    <label class="w-full py-3 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition flex items-center justify-center space-x-2 cursor-pointer">
+                        <i class="fa-solid fa-upload"></i>
+                        <span>Yedek Geri Yükle (İçe Aktar)</span>
+                        <input type="file" id="importFile" accept=".json" onchange="importJSON(event)" class="hidden">
+                    </label>
+                    <button onclick="clearData()" class="w-full py-3 rounded-xl bg-rose-600/10 text-rose-600 hover:bg-rose-600/20 font-bold text-xs transition">
+                        Tüm Verileri Temizle
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        let state = {
+            transactions: JSON.parse(localStorage.getItem('budget_txs')) || [],
+            limits: JSON.parse(localStorage.getItem('budget_limits')) || {
+                "Mutfak": 5000,
+                "Faturalar": 2000,
+                "Ulaşım": 1500,
+                "Eğlence": 1000,
+                "Maaş": 0,
+                "Diğer": 2000
+            },
+            darkMode: localStorage.getItem('budget_dark') === 'true',
+            privacyMode: false
+        };
+
+        // Init Dark Mode
+        if (state.darkMode) {
+            document.documentElement.classList.add('dark');
+        }
+
+        // Set Default Date to Today
+        document.getElementById('txDate').valueAsDate = new Date();
+
+        function saveData() {
+            localStorage.setItem('budget_txs', JSON.stringify(state.transactions));
+            localStorage.setItem('budget_limits', JSON.stringify(state.limits));
+            render();
+        }
+
+        function toggleDarkMode() {
+            state.darkMode = !state.darkMode;
+            localStorage.setItem('budget_dark', state.darkMode);
+            document.documentElement.classList.toggle('dark', state.darkMode);
+        }
+
+        function togglePrivacyMode() {
+            state.privacyMode = !state.privacyMode;
+            const btn = document.getElementById('privacyBtn');
+            btn.innerHTML = state.privacyMode ? '<i class="fa-solid fa-eye-slash text-indigo-500"></i>' : '<i class="fa-solid fa-eye"></i>';
+            render();
+        }
+
+        function formatMoney(amount) {
+            if (state.privacyMode) return '•••••• TL';
+            return Number(amount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' TL';
+        }
+
+        function switchTab(tab) {
+            ['transactions', 'limits', 'analytics', 'settings'].forEach(t => {
+                document.getElementById('view-' + t).classList.add('hidden');
+                document.getElementById('tab-' + t).className = "flex-1 py-2 text-xs font-bold rounded-xl text-slate-500 transition";
+            });
+            document.getElementById('view-' + tab).classList.remove('hidden');
+            document.getElementById('tab-' + tab).className = "flex-1 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-700 shadow-sm transition";
+        }
+
+        function addTransaction(e) {
+            e.preventDefault();
+            const tx = {
+                id: Date.now(),
+                type: document.getElementById('txType').value,
+                amount: parseFloat(document.getElementById('txAmount').value),
+                title: document.getElementById('txTitle').value,
+                category: document.getElementById('txCategory').value,
+                date: document.getElementById('txDate').value
+            };
+            state.transactions.unshift(tx);
+            saveData();
+            document.getElementById('transactionForm').reset();
+            document.getElementById('txDate').valueAsDate = new Date();
+        }
+
+        function deleteTransaction(id) {
+            state.transactions = state.transactions.filter(t => t.id !== id);
+            saveData();
+        }
+
+        function updateLimit(category, val) {
+            state.limits[category] = parseFloat(val) || 0;
+            saveData();
+        }
+
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", "butce_yedek_" + new Date().toISOString().slice(0,10) + ".json");
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            dlAnchor.remove();
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (parsed.transactions) {
+                        state.transactions = parsed.transactions;
+                        if (parsed.limits) state.limits = parsed.limits;
+                        saveData();
+                        alert('Yedek başarıyla yüklendi!');
+                    }
+                } catch(err) {
+                    alert('Geçersiz yedek dosyası!');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function clearData() {
+            if (confirm('Tüm veriler silinecek. Emin misiniz?')) {
+                state.transactions = [];
+                saveData();
+            }
+        }
+
+        function render() {
+            // Totals
+            let income = 0, expense = 0;
+            state.transactions.forEach(t => {
+                if (t.type === 'income') income += t.amount;
+                else expense += t.amount;
+            });
+            const net = income - expense;
+
+            document.getElementById('totalIncome').innerText = formatMoney(income);
+            document.getElementById('totalExpense').innerText = formatMoney(expense);
+            document.getElementById('netBalance').innerText = formatMoney(net);
+            document.getElementById('txCount').innerText = state.transactions.length;
+
+            // Transaction List
+            const txListEl = document.getElementById('transactionList');
+            if (state.transactions.length === 0) {
+                txListEl.innerHTML = '<div class="text-center py-6 text-xs text-slate-400">Henüz işlem eklenmedi.</div>';
+            } else {
+                txListEl.innerHTML = state.transactions.map(t => `
+                    flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 text-xs
+                `).join(''); // Wait, template below:
+                
+                txListEl.innerHTML = state.transactions.map(t => `
+                    <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white ${t.type === 'income' ? 'bg-emerald-500' : 'bg-rose-500'}">
+                                <i class="fa-solid ${t.type === 'income' ? 'fa-arrow-down' : 'fa-arrow-up'}"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold">${t.title}</div>
+                                <div class="text-[10px] text-slate-400">${t.category} • ${t.date}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="font-extrabold ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">
+                                ${t.type === 'income' ? '+' : '-'}${formatMoney(t.amount)}
+                            </span>
+                            <button onclick="deleteTransaction(${t.id})" class="text-slate-400 hover:text-rose-500 transition">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Category Limits Tab
+            const limitsEl = document.getElementById('categoryLimitsContainer');
+            limitsEl.innerHTML = Object.keys(state.limits).map(cat => {
+                const spent = state.transactions.filter(t => t.category === cat && t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+                const limit = state.limits[cat];
+                const pct = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0;
+                const barColor = pct > 90 ? 'bg-rose-500' : pct > 70 ? 'bg-amber-500' : 'bg-indigo-500';
+
+                return `
+                    <div class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold">${cat}</span>
+                            <span class="text-slate-500">${formatMoney(spent)} / <input type="number" value="${limit}" onchange="updateLimit('${cat}', this.value)" class="w-20 bg-slate-200 dark:bg-slate-700 rounded px-1 text-right font-semibold"></span>
+                        </div>
+                        <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                            <div class="${barColor} h-full transition-all duration-500" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Analytics Tab
+            const analyticsEl = document.getElementById('analyticsSummary');
+            const catTotals = {};
+            state.transactions.filter(t => t.type === 'expense').forEach(t => {
+                catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
+            });
+            const totalExp = expense || 1;
+
+            analyticsEl.innerHTML = Object.keys(catTotals).length === 0 ? '<div class="text-center py-6 text-slate-400">Analiz için gider verisi yok.</div>' : Object.keys(catTotals).map(cat => {
+                const amt = catTotals[cat];
+                const pct = Math.round((amt / totalExp) * 100);
+                return `
+                    <div class="space-y-1">
+                        <div class="flex justify-between font-bold">
+                            <span>${cat}</span>
+                            <span>${formatMoney(amt)} (%${pct})</span>
+                        </div>
+                        <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                            <div class="bg-indigo-600 h-full" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        render();
+    </script>
+</body>
+</html>
